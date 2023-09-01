@@ -122,7 +122,10 @@ class PrecisionPlugin(FabricPrecision, CheckpointHooks):
         clip_val: Optional[Union[int, float]] = None,
         gradient_clip_algorithm: Optional[GradClipAlgorithmType] = None,
     ) -> None:
-        if not isinstance(model, pl.LightningModule) or not model.automatic_optimization:
+        if (
+            not isinstance(model, pl.LightningModule)
+            or not model.automatic_optimization
+        ):
             # the configuration validator disallows clipping on manual
             return
 
@@ -148,12 +151,16 @@ class PrecisionPlugin(FabricPrecision, CheckpointHooks):
         elif gradient_clip_algorithm == GradClipAlgorithmType.NORM:
             self.clip_grad_by_norm(optimizer, clip_val)
 
-    def clip_grad_by_value(self, optimizer: Optimizer, clip_val: Union[int, float]) -> None:
+    def clip_grad_by_value(
+        self, optimizer: Optimizer, clip_val: Union[int, float]
+    ) -> None:
         """Clip gradients by value."""
         parameters = self.main_params(optimizer)
         torch.nn.utils.clip_grad_value_(parameters, clip_value=clip_val)
 
-    def clip_grad_by_norm(self, optimizer: Optimizer, clip_val: Union[int, float]) -> None:
+    def clip_grad_by_norm(
+        self, optimizer: Optimizer, clip_val: Union[int, float]
+    ) -> None:
         """Clip gradients by norm."""
         parameters = self.main_params(optimizer)
         torch.nn.utils.clip_grad_norm_(parameters, clip_val)

@@ -13,16 +13,33 @@
 # limitations under the License.
 import logging
 from contextlib import contextmanager
-from typing import Any, Generator, Literal, Mapping, Optional, TYPE_CHECKING, Union
+from typing import (
+    Any,
+    Generator,
+    Literal,
+    Mapping,
+    Optional,
+    TYPE_CHECKING,
+    Union,
+    Generator,
+)
 
 import torch
 from lightning_utilities import apply_to_collection
 from lightning_utilities.core.imports import RequirementCache
 from torch import Tensor
 
-from lightning.fabric.plugins.precision.precision import Precision
 from lightning.fabric.plugins.precision.utils import _convert_fp_tensor
 from lightning.fabric.utilities.rank_zero import rank_zero_warn
+from torch import Tensor
+from typing import Any, Callable, Generator, List, Optional, Tuple, Union
+
+import torch
+from torch import Tensor
+
+from lightning.pytorch.plugins.precision.precision_plugin import PrecisionPlugin
+from lightning.fabric.plugins.precision import Precision
+from transformer_engine.common.recipe import DelayedScaling
 
 _TRANSFORMER_ENGINE_AVAILABLE = RequirementCache("transformer_engine>=0.11.0")
 
@@ -86,7 +103,9 @@ class TransformerEnginePrecision(Precision):
 
     def convert_module(self, module: torch.nn.Module) -> torch.nn.Module:
         # avoid converting if any is found. assume the user took care of it
-        if self.replace_layers and not any("transformer_engine" in m.__module__ for m in module.modules()):
+        if self.replace_layers and not any(
+            "transformer_engine" in m.__module__ for m in module.modules()
+        ):
             _convert_layers(module)
         module = module.to(dtype=self.dtype)
         return module
@@ -126,10 +145,17 @@ class TransformerEnginePrecision(Precision):
         torch.set_default_dtype(default_dtype)
 
     def convert_input(self, data: Any) -> Any:
-        return apply_to_collection(data, function=_convert_fp_tensor, dtype=Tensor, dst_type=self.dtype)
+        return apply_to_collection(
+            data, function=_convert_fp_tensor, dtype=Tensor, dst_type=self.dtype
+        )
 
     def convert_output(self, data: Any) -> Any:
-        return apply_to_collection(data, function=_convert_fp_tensor, dtype=Tensor, dst_type=torch.get_default_dtype())
+        return apply_to_collection(
+            data,
+            function=_convert_fp_tensor,
+            dtype=Tensor,
+            dst_type=torch.get_default_dtype(),
+        )
 
 
 def _convert_layers(module: torch.nn.Module) -> None:
@@ -146,7 +172,9 @@ def _convert_layers(module: torch.nn.Module) -> None:
                 )
                 continue
             has_bias = child.bias is not None
-            replacement = te.Linear(child.in_features, child.out_features, bias=has_bias)
+            replacement = te.Linear(
+                child.in_features, child.out_features, bias=has_bias
+            )
             replacement.weight.data = child.weight.data.clone()
             if has_bias:
                 replacement.bias.data = child.bias.data.clone()
@@ -162,3 +190,9 @@ def _convert_layers(module: torch.nn.Module) -> None:
             # there are other transformer engine layers that we could convert but require fusion. full list at:
             # https://docs.nvidia.com/deeplearning/transformer-engine/user-guide/api/pytorch.html
             _convert_layers(child)
+
+
+class TransformerEnginePrecisionPlugin(TransformerEnginePrecision, PrecisionPlugin):
+    """Plugin adds base PrecisionPlugin methods to TransformerEnginePrecision to hook into Trainer"""
+
+    pass
